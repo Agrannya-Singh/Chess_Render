@@ -1,7 +1,7 @@
 FROM python:3.9-slim
 
-# 1. Install dependencies (wget, tar) as root by default and clean up apt cache
-RUN apt-get update && apt-get install -y wget tar && rm -rf /var/lib/apt/lists/*
+# 1. Install dependencies (wget, tar, install) as root by default and clean up apt cache
+RUN apt-get update && apt-get install -y wget tar coreutils && rm -rf /var/lib/apt/lists/*
 
 # 2. Set working directory
 WORKDIR /app
@@ -13,11 +13,10 @@ RUN pip install --no-cache-dir -r requirements.txt
 # 4. Copy application source code
 COPY . .
 
-# 5. Download and extract Stockfish binary, move it, and make executable
+# 5. Download and extract Stockfish binary, and install it with execute permissions
 RUN wget https://github.com/official-stockfish/Stockfish/releases/latest/download/stockfish-ubuntu-x86-64-avx2.tar && \
     tar -xvf stockfish-ubuntu-x86-64-avx2.tar && \
-    mv stockfish /usr/local/bin/ && \
-    chmod +x /usr/local/bin/stockfish && \
+    install -m 755 stockfish /usr/local/bin/stockfish && \
     rm stockfish-ubuntu-x86-64-avx2.tar
 
 # 6. Confirm that the stockfish binary is executable and owned by root
