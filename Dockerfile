@@ -1,33 +1,47 @@
+# Use the official Python 3.9 slim image as the base
 FROM python:3.9-slim
 
-# 1. Install dependencies (wget, tar) as root by default and clean up apt cache
-RUN apt-get update && apt-get install -y wget tar && rm -rf /var/lib/apt/lists/*
+# Install necessary system dependencies (wget, tar, and coreutils for the 'install' command).
+# We chain these commands with '&& \' to keep them within a single RUN instruction,
+# and then clean up the apt cache to keep the image size down.
+RUN apt-get update && \
+    apt-get install -y wget tar coreutils && \
+    rm -rf /var/lib/apt/lists/*
 
-# 2. Set working directory
+# Set the working directory inside the container
 WORKDIR /app
 
-# 3. Copy requirements and install python packages
+# Copy the Python requirements file and install the dependencies.
+# '--no-cache-dir' helps reduce image size by not storing pip's cache.
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# 4. Copy application source code
+# Copy the rest of your application's source code into the container
 COPY . .
 
-# 5. Download and extract Stockfish binary, move it, and make executable
+# Download, extract, and install the Stockfish binary.
+# The 'install -m 755' command is used here to copy the binary and
+# simultaneously set its permissions to be executable (755).
+# This is more robust than 'mv' followed by 'chmod'.
+# All these operations are chained in a single RUN command to prevent
+# "unknown instruction" errors and optimize Docker layers.
 RUN wget https://github.com/official-stockfish/Stockfish/releases/latest/download/stockfish-ubuntu-x86-64-avx2.tar && \
     tar -xvf stockfish-ubuntu-x86-64-avx2.tar && \
-    chmod 755 /usr/local/bin/ # Ensure /usr/local/bin is writable, even though it should be for root
-    mv stockfish /usr/local/bin/stockfish && \
-    chmod +x /usr/local/bin/stockfish && \
+    install -m 755 stockfish /usr/local/bin/stockfish && \
     rm stockfish-ubuntu-x86-64-avx2.tar
 
-# 6. Confirm that the stockfish binary is executable and owned by root
+# Verify that Stockfish was correctly installed and is executable.
+# This step helps confirm the previous RUN command was successful.
 RUN ls -l /usr/local/bin/stockfish
 
-# 7. Explicitly set to run container as root user (default anyway, but explicit)
+# Explicitly set the user to root. While this is often the default,
+# being explicit can improve clarity for others reading the Dockerfile.
 USER root
 
+# Set an environment variable for the Stockfish path, which your application
+# might use to locate the engine.
 ENV STOCKFISH_PATH=/usr/local/bin/stockfish
 
-# 8. Run your app with uvicorn on port 8000
+# Define the command to run your application using Uvicorn when the container starts.
+# It listens on all network interfaces (0.0.0.0) on port 8000.
 CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
