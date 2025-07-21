@@ -1,25 +1,32 @@
 FROM python:3.9-slim
 
-# Install dependencies for Stockfish and wget
+# 1. Install dependencies (wget, tar) as root by default and clean up apt cache
 RUN apt-get update && apt-get install -y wget tar && rm -rf /var/lib/apt/lists/*
 
+# 2. Set working directory
 WORKDIR /app
 
-# Copy and install Python dependencies
+# 3. Copy requirements and install python packages
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy application code
+# 4. Copy application source code
 COPY . .
 
-# Download and extract Stockfish binary
+# 5. Download and extract Stockfish binary, move it, and make executable
 RUN wget https://github.com/official-stockfish/Stockfish/releases/latest/download/stockfish-ubuntu-x86-64-avx2.tar && \
     tar -xvf stockfish-ubuntu-x86-64-avx2.tar && \
     mv stockfish /usr/local/bin/ && \
     chmod +x /usr/local/bin/stockfish && \
     rm stockfish-ubuntu-x86-64-avx2.tar
 
+# 6. Confirm that the stockfish binary is executable and owned by root
+RUN ls -l /usr/local/bin/stockfish
+
+# 7. Explicitly set to run container as root user (default anyway, but explicit)
+USER root
+
 ENV STOCKFISH_PATH=/usr/local/bin/stockfish
 
-# Run the application
+# 8. Run your app with uvicorn on port 8000
 CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
